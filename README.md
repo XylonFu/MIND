@@ -1,6 +1,6 @@
 # MIND Synthetic Data Generator
 
-This repository contains an implementation of the synthetic data generation process described in the paper [MIND: Math Informed Synthetic Dialogues for Pretraining LLMs](https://arxiv.org/pdf/2410.12881). The code focuses on generating high-quality math-informed synthetic dialogues using large language models, aligning with the principles and methodology highlighted in the paper.
+This repository contains an implementation of the synthetic data generation process described in the paper [MIND: Math Informed Synthetic Dialogues for Pretraining LLMs](https://arxiv.org/pdf/2410.12881). The code focuses on generating high-quality math-informed synthetic dialogues for continued pretraining LLMs, aligning with the principles and methodology highlighted in the paper.
 
 ## Features
 
