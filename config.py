@@ -5,14 +5,17 @@ from dotenv import load_dotenv
 # 加载 .env 文件
 load_dotenv()
 
-# API 配置
+# 接口配置
 API_KEY = os.getenv("API_KEY")
 TOKENIZER_URL = "https://open.bigmodel.cn/api/paas/v4/tokenizer"
 
-# 文件路径配置
-INPUT_FILE_PATH = "data/train-00000-of-00114.parquet"
+# 文件配置
+INPUT_FILE_PATH = "data/MATH.json"
 PROCESSED_INDICES_FILE = "data/processed_indices.txt"
-OUTPUT_FILE_PATH = "data/MIND-OWM-00000-of-00114.jsonl"
+OUTPUT_FILE_PATH = "data/MIND-MATH-1.jsonl"
+
+# 数据配置
+DATA_ROW_LIMIT = 3000
 
 # 模型配置
 MODEL_NAME = "glm-4-flash"
@@ -21,17 +24,16 @@ TEMPERATURE = 1.0
 TOP_P = 0.9
 PROMPT = (
     "Convert the context above as a multi-turn discussions between a teacher and a student. "
-    "The student has questions about the context and the teacher solves each of them step-by-step. "
-    "Make sure that their discussions strictly adhere to the context above and remains faithful to information in the context. "
-    "Please DONOT add any new information/reference other than the context."
+    "The teacher starts from the basics and guides the student step-by-step to learn and solve the problem. "
+    "Make sure that their discussions strictly adhere to the context above and remains faithful to information in the context."
 )
 
-# Token 配置
-TOKEN_LIMIT = 500
-MIN_GENERATED_TOKEN_LENGTH = 500
+# 词元配置
+TOKEN_LIMIT = 8096
+MIN_GENERATED_TOKEN_LENGTH = 0
 
-# 异步调用
+# 异步配置
 USE_ASYNC = True
-MAX_CONCURRENT_TASKS = 1000
+MAX_CONCURRENT_TASKS = 100
 ASYNC_CHECK_INTERVAL = 10
 ASYNC_MAX_RETRIES = 60
