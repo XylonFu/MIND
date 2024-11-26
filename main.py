@@ -5,13 +5,14 @@ from tqdm.asyncio import tqdm as async_tqdm
 
 from api_client import generate_conversation, generate_conversation_async
 from config import *
-from file_manager import load_parquet_file, load_processed_indices, save_processed_index, save_jsonl
+from file_manager import load_json_file, load_processed_indices, save_processed_index, save_jsonl
 from tokenizer import get_token_count, split_text_into_chunks
 
 
-async def process_chunks_async(index, chunks):
+async def process_chunks_async(data_id, chunks):
     """
     异步处理一个 raw_text 的所有 chunks。
+    如果任何一个 chunk 处理失败，则返回 None，表示放弃整个 data_id。
     """
     results = []
     for chunk in chunks:
@@ -29,14 +30,17 @@ async def process_chunks_async(index, chunks):
 
             results.append(generated_text)
         except Exception as e:
-            print(f"Error processing index {index}, chunk failed: {e}")
+            print(f"Error processing id {data_id}, chunk failed: {e}")
+            # 如果任何一个 chunk 失败，直接返回 None
+            return None
 
-    return index, results
+    return data_id, results
 
 
-def process_chunks_sync(index, chunks):
+def process_chunks_sync(data_id, chunks):
     """
     同步处理一个 raw_text 的所有 chunks。
+    如果任何一个 chunk 处理失败，则返回 None，表示放弃整个 data_id。
     """
     results = []
     for chunk in chunks:
@@ -54,9 +58,11 @@ def process_chunks_sync(index, chunks):
 
             results.append(generated_text)
         except Exception as e:
-            print(f"Error processing index {index}, chunk failed: {e}")
+            print(f"Error processing id {data_id}, chunk failed: {e}")
+            # 如果任何一个 chunk 失败，直接返回 None
+            return None
 
-    return index, results
+    return data_id, results
 
 
 async def save_results(save_queue):
@@ -84,7 +90,7 @@ async def main_async():
     异步处理主逻辑，支持同时处理多个 raw_text。
     """
     # 加载输入数据
-    raw_text_col = load_parquet_file(INPUT_FILE_PATH, limit=1000)
+    raw_text_col = load_json_file(INPUT_FILE_PATH, limit=DATA_ROW_LIMIT)
 
     # 加载已处理的索引
     processed_indices = load_processed_indices(PROCESSED_INDICES_FILE)
@@ -98,24 +104,29 @@ async def main_async():
     # 限制并发任务数
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 
-    async def limited_process_chunks_async(index, chunks):
+    async def limited_process_chunks_async(data_id, chunks):
         async with semaphore:
-            return await process_chunks_async(index, chunks)
+            return await process_chunks_async(data_id, chunks)
 
     # 创建任务列表
     tasks = []
-    for index, raw_text in enumerate(raw_text_col):
-        if index in processed_indices:
+    for _, row in raw_text_col.iterrows():
+        data_id, raw_text = row['id'], row['text']
+        if data_id in processed_indices:
             continue
 
         chunks = split_text_into_chunks(raw_text, TOKEN_LIMIT)
-        tasks.append(asyncio.create_task(limited_process_chunks_async(index, chunks)))
+        tasks.append(asyncio.create_task(limited_process_chunks_async(data_id, chunks)))
 
     # 使用 async_tqdm 显示任务进度
     for task in async_tqdm(asyncio.as_completed(tasks), total=len(tasks)):
-        index, results = await task
+        result = await task
+        if result is None:  # 如果处理失败，则跳过保存
+            continue
+
+        data_id, results = result
         # 将结果放入保存队列
-        await save_queue.put((index, results))
+        await save_queue.put((data_id, results))
 
     # 等待所有保存完成
     await save_queue.join()
@@ -128,25 +139,30 @@ def main_sync():
     同步处理主逻辑。
     """
     # 加载输入数据
-    raw_text_col = load_parquet_file(INPUT_FILE_PATH, limit=1000)
+    raw_text_col = load_json_file(INPUT_FILE_PATH, limit=DATA_ROW_LIMIT)
 
     # 加载已处理的索引
     processed_indices = load_processed_indices(PROCESSED_INDICES_FILE)
 
     # 同步处理数据并显示进度
-    for index, raw_text in tqdm(enumerate(raw_text_col), total=len(raw_text_col)):
-        if index in processed_indices:
+    for _, row in tqdm(raw_text_col.iterrows(), total=len(raw_text_col)):
+        data_id, raw_text = row['id'], row['text']
+        if data_id in processed_indices:
             continue
 
         chunks = split_text_into_chunks(raw_text, TOKEN_LIMIT)
-        index, results = process_chunks_sync(index, chunks)
+        result = process_chunks_sync(data_id, chunks)
+        if result is None:  # 如果处理失败，则跳过保存
+            continue
+
+        data_id, results = result
 
         # 保存生成结果
         for text in results:
-            save_jsonl(OUTPUT_FILE_PATH, {"id": index, "text": text})
+            save_jsonl(OUTPUT_FILE_PATH, {"id": data_id, "text": text})
 
         # 更新已处理索引
-        save_processed_index(PROCESSED_INDICES_FILE, index)
+        save_processed_index(PROCESSED_INDICES_FILE, data_id)
 
 
 if __name__ == "__main__":
