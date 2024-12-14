@@ -11,18 +11,18 @@ from tokenizer import get_token_count, split_text_into_chunks
 
 async def process_chunks_async(data_id, chunks):
     """
-    异步处理一个 raw_text 的所有 chunks。
-    如果任何一个 chunk 处理失败，则返回 None，表示放弃整个 data_id。
+    Asynchronously process all chunks of a raw_text.
+    If any chunk fails, return None, indicating the entire data_id is skipped.
     """
     results = []
     for chunk in chunks:
         content = chunk + "\n\n\n" + PROMPT
 
         try:
-            # 调用异步生成 API
+            # Call the asynchronous generation API
             generated_text = await generate_conversation_async(content)
 
-            # 检查生成结果 token 数
+            # Check the token count of the generated result
             generated_tokens = get_token_count(generated_text)
             if generated_tokens < MIN_GENERATED_TOKEN_LENGTH:
                 print(f"Discarded chunk: generated text too short ({generated_tokens} tokens).")
@@ -31,7 +31,7 @@ async def process_chunks_async(data_id, chunks):
             results.append(generated_text)
         except Exception as e:
             print(f"Error processing id {data_id}, chunk failed: {e}")
-            # 如果任何一个 chunk 失败，直接返回 None
+            # If any chunk fails, return None immediately
             return None
 
     return data_id, results
@@ -39,18 +39,18 @@ async def process_chunks_async(data_id, chunks):
 
 def process_chunks_sync(data_id, chunks):
     """
-    同步处理一个 raw_text 的所有 chunks。
-    如果任何一个 chunk 处理失败，则返回 None，表示放弃整个 data_id。
+    Synchronously process all chunks of a raw_text.
+    If any chunk fails, return None, indicating the entire data_id is skipped.
     """
     results = []
     for chunk in chunks:
         content = chunk + "\n\n\n" + PROMPT
 
         try:
-            # 调用同步生成 API
+            # Call the synchronous generation API
             generated_text = generate_conversation(content)
 
-            # 检查生成结果 token 数
+            # Check the token count of the generated result
             generated_tokens = get_token_count(generated_text)
             if generated_tokens < MIN_GENERATED_TOKEN_LENGTH:
                 print(f"Discarded chunk: generated text too short ({generated_tokens} tokens).")
@@ -59,7 +59,7 @@ def process_chunks_sync(data_id, chunks):
             results.append(generated_text)
         except Exception as e:
             print(f"Error processing id {data_id}, chunk failed: {e}")
-            # 如果任何一个 chunk 失败，直接返回 None
+            # If any chunk fails, return None immediately
             return None
 
     return data_id, results
@@ -67,19 +67,19 @@ def process_chunks_sync(data_id, chunks):
 
 async def save_results(save_queue):
     """
-    持续从队列中获取生成结果，并保存到文件。
+    Continuously retrieve generated results from the queue and save them to the file.
     """
     while True:
         item = await save_queue.get()
         if item is None:
-            break  # 队列结束信号
+            break  # Queue end signal
         index, results = item
 
-        # 保存生成结果
+        # Save the generated results
         for text in results:
             save_jsonl(OUTPUT_FILE_PATH, {"id": index, "text": text})
 
-        # 更新已处理索引
+        # Update the processed indices
         save_processed_index(PROCESSED_INDICES_FILE, index)
 
         save_queue.task_done()
@@ -87,28 +87,28 @@ async def save_results(save_queue):
 
 async def main_async():
     """
-    异步处理主逻辑，支持同时处理多个 raw_text。
+    Asynchronous main logic to support processing multiple raw_texts simultaneously.
     """
-    # 加载输入数据
+    # Load input data
     raw_text_col = load_json_file(INPUT_FILE_PATH, limit=DATA_ROW_LIMIT)
 
-    # 加载已处理的索引
+    # Load processed indices
     processed_indices = load_processed_indices(PROCESSED_INDICES_FILE)
 
-    # 创建保存队列
+    # Create a save queue
     save_queue = asyncio.Queue()
 
-    # 启动保存任务
+    # Start the save task
     save_task = asyncio.create_task(save_results(save_queue))
 
-    # 限制并发任务数
+    # Limit the number of concurrent tasks
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 
     async def limited_process_chunks_async(data_id, chunks):
         async with semaphore:
             return await process_chunks_async(data_id, chunks)
 
-    # 创建任务列表
+    # Create a list of tasks
     tasks = []
     for _, row in raw_text_col.iterrows():
         data_id, raw_text = row['id'], row['text']
@@ -118,33 +118,33 @@ async def main_async():
         chunks = split_text_into_chunks(raw_text, TOKEN_LIMIT)
         tasks.append(asyncio.create_task(limited_process_chunks_async(data_id, chunks)))
 
-    # 使用 async_tqdm 显示任务进度
+    # Use async_tqdm to display task progress
     for task in async_tqdm(asyncio.as_completed(tasks), total=len(tasks)):
         result = await task
-        if result is None:  # 如果处理失败，则跳过保存
+        if result is None:  # Skip saving if processing failed
             continue
 
         data_id, results = result
-        # 将结果放入保存队列
+        # Put the result into the save queue
         await save_queue.put((data_id, results))
 
-    # 等待所有保存完成
+    # Wait for all saves to complete
     await save_queue.join()
-    save_queue.put_nowait(None)  # 发送结束信号
+    save_queue.put_nowait(None)  # Send end signal
     await save_task
 
 
 def main_sync():
     """
-    同步处理主逻辑。
+    Synchronous main logic.
     """
-    # 加载输入数据
+    # Load input data
     raw_text_col = load_json_file(INPUT_FILE_PATH, limit=DATA_ROW_LIMIT)
 
-    # 加载已处理的索引
+    # Load processed indices
     processed_indices = load_processed_indices(PROCESSED_INDICES_FILE)
 
-    # 同步处理数据并显示进度
+    # Process data synchronously and display progress
     for _, row in tqdm(raw_text_col.iterrows(), total=len(raw_text_col)):
         data_id, raw_text = row['id'], row['text']
         if data_id in processed_indices:
@@ -152,16 +152,16 @@ def main_sync():
 
         chunks = split_text_into_chunks(raw_text, TOKEN_LIMIT)
         result = process_chunks_sync(data_id, chunks)
-        if result is None:  # 如果处理失败，则跳过保存
+        if result is None:  # Skip saving if processing failed
             continue
 
         data_id, results = result
 
-        # 保存生成结果
+        # Save the generated results
         for text in results:
             save_jsonl(OUTPUT_FILE_PATH, {"id": data_id, "text": text})
 
-        # 更新已处理索引
+        # Update the processed indices
         save_processed_index(PROCESSED_INDICES_FILE, data_id)
 
 

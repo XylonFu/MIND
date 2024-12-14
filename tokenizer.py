@@ -9,24 +9,25 @@ import tiktoken
 
 def split_text_into_chunks(text, token_limit, model="gpt-4o"):
     """
-    将文本切分为多个块，确保每块的 token 数量不超过指定的限制，并保留原始文本格式。
+    Split the text into multiple chunks, ensuring that the number of tokens in each chunk
+    does not exceed the specified limit while preserving the original text format.
     """
-    # 初始化编码器
+    # Initialize the encoder
     encoder = tiktoken.encoding_for_model(model)
     tokens = encoder.encode(text)
 
-    # 直接按 token 分片
+    # Directly split tokens into chunks
     chunks = [tokens[i:i + token_limit] for i in range(0, len(tokens), token_limit)]
 
-    # 仅在最后解码所有块
+    # Decode all chunks only at the end
     return [encoder.decode(chunk) for chunk in chunks]
 
 
 def get_token_count(text, model="gpt-4o"):
     """
-    获取给定文本的 token 数量。
+    Get the token count for the given text.
     """
-    # 初始化编码器
+    # Initialize the encoder
     encoder = tiktoken.encoding_for_model(model)
     tokens = encoder.encode(text)
     return len(tokens)

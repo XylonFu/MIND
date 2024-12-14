@@ -1,101 +1,139 @@
 # MIND Synthetic Data Generator
 
-This repository contains an implementation of the synthetic data generation process described in the paper [MIND: Math Informed Synthetic Dialogues for Pretraining LLMs](https://arxiv.org/pdf/2410.12881). The code focuses on generating high-quality math-informed synthetic dialogues for continued pretraining LLMs, aligning with the principles and methodology highlighted in the paper.
+This repository provides an implementation for generating synthetic math-informed dialogues inspired by the methodology described in the following paper:
 
-## Features
+> Syeda Nahida Akter, Shrimai Prabhumoye, John Kamalu, Sanjeev Satheesh, Eric Nyberg, Mostofa Patwary, Mohammad Shoeybi, Bryan Catanzaro.  
+> **MIND: Math Informed syNthetic Dialogues for Pretraining LLMs**  
+> *arXiv preprint arXiv:2410.12881, 2024*  
+> [Link to Paper](https://arxiv.org/pdf/2410.12881)
 
-- **Conversation Generation**: Converts raw mathematical contexts into structured, multi-turn conversations.
-- **Token-Based Splitting**: Splits large texts into manageable chunks to optimize input for language models.
-- **Dynamic Filtering**: Ensures the generated conversations meet token and quality thresholds.
-- **Continuous Preprocessing**: Efficiently processes raw data, tracks progress, and supports resuming interrupted tasks.
+This codebase is designed to help users preprocess raw math problems and their solutions into multi-turn teacher-student dialogues suitable for continued pretraining of large language models (LLMs). By emulating the approach described in the MIND paper, this repository supports crafting natural, step-by-step tutoring conversations that guide a student through understanding and solving mathematical problems.
 
-## File Overview
+## Key Features
 
-### 1. `api_client.py`
-Handles the interaction with the ZhipuAI model API to generate synthetic conversations. 
+- **MIND-Inspired Dialogue Generation**: Converts raw mathematical context (problems and solutions) into multi-turn, structured dialogues where a virtual "teacher" systematically guides a "student" to reason through math problems.
+- **Token-Based Text Splitting**: Automatically splits lengthy problem descriptions and solutions into manageable chunks based on a token limit, ensuring compliance with LLM constraints.
+- **Asynchronous & Synchronous Processing**: Supports both synchronous and asynchronous processing of texts for efficient scaling.
+- **Dynamic Quality Filtering**: Skips over outputs that do not meet minimum quality or length thresholds, helping maintain high-quality dialogue data.
+- **Resumable Processing**: Tracks processed indices, allowing the generation process to resume from where it left off without reprocessing previously completed items.
 
-Key Function:
-- `generate_conversation(content)`: Generates a structured dialogue based on the provided content and predefined prompts.
+## Repository Structure
 
-### 2. `config.py`
-Centralized configuration for the project, including API keys, file paths, model settings, and prompts.
+- **`api_client.py`**:  
+  Handles the interaction with the ZhipuAI LLM API.  
+  - `generate_conversation` and `generate_conversation_async` functions invoke the language model to produce dialogues from a given text prompt.
 
-Highlights:
-- **Model Parameters**: Configurable token limits, temperature, and top-p settings.
-- **Prompt Template**: Ensures consistency in conversation generation styles.
+- **`config.py`**:  
+  Centralizes all configuration parameters, including API keys, model and tokenization parameters, file paths, and prompt templates.
 
-### 3. `file_manager.py`
-Manages data I/O operations for handling input and output files in various formats.
+- **`file_manager.py`**:  
+  Manages data input/output.  
+  - `load_json_file` and `load_parquet_file` handle loading of input data.  
+  - `save_jsonl` appends generated dialogues to a `.jsonl` output file.  
+  - Utilities like `load_processed_indices` and `save_processed_index` help maintain resumability.
 
-Key Functions:
-- `load_parquet_file(file_path)`: Reads raw text data from a parquet file.
-- `save_jsonl(file_path, data)`: Appends generated data to a JSONL file.
+- **`main.py`**:  
+  Orchestrates the entire data generation pipeline.  
+  - Loads raw problem data.  
+  - Splits texts into token-limited chunks.  
+  - Calls the LLM to generate teacher-student dialogues.  
+  - Saves generated dialogues to the output JSONL file and records processed indices.
 
-### 4. `main.py`
-Main script for orchestrating the data generation workflow, including:
-- Loading raw text data.
-- Splitting and processing text chunks.
-- Generating conversations using the API.
-- Saving results and updating progress.
+- **`tokenizer.py`**:  
+  Provides tokenization utilities using `tiktoken`.  
+  - `split_text_into_chunks` divides long texts into manageable segments.  
+  - `get_token_count` measures token length to ensure quality and token-limit compliance.
 
-### 5. `tokenizer.py`
-Tokenizes and splits text for efficient processing with language models.
+## Getting Started
 
-Key Functions:
-- `split_text_into_chunks(text, token_limit)`: Splits text into chunks based on token limits.
-- `get_token_count(text)`: Calculates the token count for a given text.
+### 1. Environment Setup
 
-## Prerequisites
+1. **Install Dependencies**:  
+   Make sure you have Python 3.9+ installed.  
+   Install dependencies by running:  
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-1. **Environment Setup**: Install the required Python libraries using `pip install -r requirements.txt`.
-2. **API Key**: Add your API key to the `.env` file in the following format:
+2. **API Key Configuration**:  
+   Create a `.env` file in the project root and specify your API key:  
    ```plaintext
    API_KEY=your_api_key_here
    ```
 
-## How to Use
+   The code uses this key to authenticate calls to the ZhipuAI model.
 
-1. **Configure Settings**:
-   - Update the `config.py` file with your preferred settings, including file paths and model parameters.
-   - Prepare your raw data in parquet format and set the path in `INPUT_FILE_PATH`.
+### 2. Data Preparation
 
-2. **Run the Main Script**:
-   Execute the `main.py` file to start generating synthetic dialogues:
-   ```bash
-   python main.py
-   ```
+- **Input File**:  
+  Place your input math data (problems and solutions) in `data/MATH.json` or configure another file path in `config.py`.
+  
+- **Data Format**:  
+  The input JSON should contain fields like `id`, `problem`, `solution`, `level`, and `type` (if applicable). The code will sample data according to the specified limits and distributions.
 
-3. **Monitor Progress**:
-   - Processed indices are logged to prevent redundant processing.
-   - Generated data is saved incrementally in the specified JSONL file.
+### 3. Configuration
 
-4. **Output**:
-   - The generated dialogues are saved in the JSONL format, adhering to the MIND structure.
+Open `config.py` to adjust:
+- **Model Settings**:  
+  - `MODEL_NAME`, `MAX_TOKENS`, `TEMPERATURE`, `TOP_P`  
+- **Prompt Template**:  
+  Adjust `PROMPT` to control the style of the generated dialogues.
+- **File Paths**:  
+  Modify `INPUT_FILE_PATH`, `OUTPUT_FILE_PATH`, `PROCESSED_INDICES_FILE` as needed.
 
-## Example
+### 4. Running the Pipeline
 
-```json
-{
-  "id": 1,
-  "text": "Teacher: The problem asks us to calculate how many numbers can be formed using the digits 2, 3, 5, 6, and 7...\nStudent: Why can the digits repeat?..."
-}
+**Asynchronous Mode (default)**:
+```bash
+python main.py
 ```
+
+**Synchronous Mode** (set `USE_ASYNC = False` in `config.py`):
+```bash
+python main.py
+```
+
+As the script runs, it will:
+- Load and sample data from `MATH.json`.
+- Generate multi-turn dialogues based on the prompt and context.
+- Split long content into manageable chunks and handle them individually.
+- Save dialogues to `MIND-MATH-2.jsonl`.
+- Record processed items in `processed_indices.txt`.
+
+You can monitor the progress via a command-line progress bar.
+
+### 5. Output
+
+The output file (`.jsonl`) will contain entries like:
+```json
+{"id": 123, "text": "Teacher: Let's start with the basics of this problem... \nStudent: I see, so we first consider..."}
+```
+
+Each `id` corresponds to the input problem’s identifier, and `text` is the generated teacher-student dialogue.
 
 ## Customization
 
-- **Adjust Prompts**: Modify the `PROMPT` variable in `config.py` to experiment with different conversational styles.
-- **Model Configuration**: Update `MODEL_NAME` and token limits to use other pre-trained models.
+- **Prompt Engineering**:  
+  Experiment with the `PROMPT` in `config.py` to produce different tutoring styles or question-and-answer formats.
+- **Chunk Size & Token Limits**:  
+  Adjust `TOKEN_LIMIT` in `config.py` to control how text is divided, influencing reasoning depth and complexity.
+- **Sampling Strategies**:  
+  In `file_manager.py`, the code attempts stratified sampling by `level` and `type`. Adjust these strategies as needed.
 
-## References
+## Reference
 
-- Paper: [MIND: Math Informed Synthetic Dialogues for Pretraining LLMs](https://arxiv.org/pdf/2410.12881)
-- Dataset: OpenWebMath (OWM)
-- Model: ZhipuAI LLMs
+This implementation is based on the MIND approach introduced in the paper:
+
+> **MIND: Math Informed syNthetic Dialogues for Pretraining LLMs (2024)**  
+> *Syeda Nahida Akter, Shrimai Prabhumoye, John Kamalu, Sanjeev Satheesh, Eric Nyberg, Mostofa Patwary, Mohammad Shoeybi, Bryan Catanzaro*  
+> [arXiv:2410.12881](https://arxiv.org/pdf/2410.12881)
+
+The MIND methodology inspires turning static math problems into dynamic, instructive dialogues that closely align with real tutoring sessions, potentially enhancing the LLM’s mathematical reasoning and explanatory abilities.
 
 ## License
 
-This code is provided under the MIT License. See the `LICENSE` file for more details.
+This code is released under the MIT License. See the `LICENSE` file for details.
 
 ---
 
-Feel free to explore and adapt this repository to generate high-quality synthetic data for pretraining mathematical reasoning in LLMs!
+By following these instructions and adapting the provided pipeline, you can generate math-informed synthetic dialogues that serve as valuable pretraining data for LLMs, replicating and extending the insights from the MIND approach.

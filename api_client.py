@@ -4,13 +4,13 @@ from zhipuai import ZhipuAI
 
 from config import API_KEY, MODEL_NAME, MAX_TOKENS, TEMPERATURE, TOP_P, ASYNC_CHECK_INTERVAL, ASYNC_MAX_RETRIES
 
-# 初始化 ZhipuAI 客户端
+# Initialize the ZhipuAI client
 client = ZhipuAI(api_key=API_KEY)
 
 
 def generate_conversation(content, model=MODEL_NAME, max_tokens=MAX_TOKENS, temperature=TEMPERATURE, top_p=TOP_P):
     """
-    调用 ZhipuAI 模型生成对话（同步方式）。
+    Call the ZhipuAI model to generate a conversation (synchronous mode).
     """
     response = client.chat.completions.create(
         model=model,
@@ -25,7 +25,7 @@ def generate_conversation(content, model=MODEL_NAME, max_tokens=MAX_TOKENS, temp
 async def generate_conversation_async(content, model=MODEL_NAME, max_tokens=MAX_TOKENS, temperature=TEMPERATURE,
                                       top_p=TOP_P):
     """
-    调用 ZhipuAI 模型生成对话（异步方式）。
+    Call the ZhipuAI model to generate a conversation (asynchronous mode).
     """
     response = await asyncio.to_thread(
         client.chat.asyncCompletions.create,
@@ -40,7 +40,7 @@ async def generate_conversation_async(content, model=MODEL_NAME, max_tokens=MAX_
     task_status = ""
     retries = 0
 
-    # 查询任务结果
+    # Query task results
     while task_status != "SUCCESS" and task_status != "FAILED" and retries < ASYNC_MAX_RETRIES:
         result_response = await asyncio.to_thread(
             client.chat.asyncCompletions.retrieve_completion_result,
